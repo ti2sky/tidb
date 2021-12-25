@@ -17,6 +17,8 @@ package executor
 import (
 	"context"
 	"fmt"
+	"github.com/SkyAPM/go2sky"
+	language_agent "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/failpoint"
@@ -54,6 +56,17 @@ func (c *Compiler) Compile(ctx context.Context, stmtNode ast.StmtNode) (*ExecStm
 		span1 := span.Tracer().StartSpan("executor.Compile", opentracing.ChildOf(span.Context()))
 		defer span1.Finish()
 		ctx = opentracing.ContextWithSpan(ctx, span1)
+	}
+	if span := go2sky.SpanFromContext(ctx); span != nil {
+		tracer := (*span).Tracer()
+		s, c, e := tracer.CreateLocalSpan(ctx)
+		if e != nil {
+			return nil, e
+		}
+		s.SetOperationName("executor.Compile")
+		s.SetSpanLayer(language_agent.SpanLayer_Database)
+		defer s.End()
+		ctx = c
 	}
 
 	ret := &plannercore.PreprocessorReturn{}
