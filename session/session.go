@@ -2878,8 +2878,8 @@ func logGeneralQuery(execStmt *executor.ExecStmt, s *session, isPrepared bool) {
 			builder.WriteString(vars.CurrentDB)
 			text := executor.QueryReplacer.Replace(sql)
 			builder.WriteString(text)
-			builder.WriteString(" ")
 			if vars.PreparedParams != nil {
+				builder.WriteString(" ")
 				builder.WriteString(vars.PreparedParams.String())
 			}
 			builder.WriteString("\n")
