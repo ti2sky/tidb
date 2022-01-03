@@ -24,7 +24,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"runtime/pprof"
 	"runtime/trace"
 	"strconv"
@@ -32,6 +31,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/ngaut/pools"
 	"github.com/opentracing/opentracing-go"
@@ -2866,27 +2867,29 @@ func logGeneralQuery(execStmt *executor.ExecStmt, s *session, isPrepared bool) {
 	cfg := config.GetGlobalConfig()
 	vars := s.GetSessionVars()
 	if !s.isInternal() && cfg.EnableReplaySQL.Load() {
-		go func(vars *variable.SessionVars) {
-			//TODO: We need to add a client col also.
-			var builder strings.Builder
-			builder.WriteString(fmt.Sprintf("%v", vars.ConnectionID))
+		//go func(vars *variable.SessionVars) {
+		//TODO: We need to add a client col also.
+		var builder strings.Builder
+		builder.WriteString(fmt.Sprintf("%v", vars.ConnectionID))
+		builder.WriteString(" ")
+		// Logic TS
+		ts := strconv.FormatInt(s.sessionVars.StartTime.Unix()-cfg.ReplayMetaTS, 10)
+		builder.WriteString(ts)
+		builder.WriteString(" ")
+		builder.WriteString(vars.CurrentDB)
+		builder.WriteString(" ")
+		//text := executor.QueryReplacer.Replace(s.sessionVars.StmtCtx.OriginalSQL)
+		builder.WriteString(s.sessionVars.StmtCtx.OriginalSQL)
+		//fmt.Printf("SQL %s ", vars.SQL)
+		//fmt.Printf("origin sql %v", s.sessionVars.StmtCtx.OriginalSQL)
+		if vars.PreparedParams != nil {
 			builder.WriteString(" ")
-			// Logic TS
-			ts := strconv.FormatInt(s.sessionVars.StartTime.Unix()-cfg.ReplayMetaTS, 10)
-			builder.WriteString(ts)
-			builder.WriteString(" ")
-			builder.WriteString(vars.CurrentDB)
-			builder.WriteString(" ")
-			fmt.Printf("SQL %s\n", vars.SQL)
-			text := executor.QueryReplacer.Replace(vars.SQL)
-			builder.WriteString(text)
-			if vars.PreparedParams != nil {
-				builder.WriteString(" ")
-				builder.WriteString(vars.PreparedParams.String())
-			}
-			builder.WriteString("\n")
-			logutil.PutRecordOrDrop(builder.String())
-		}(vars)
+			builder.WriteString(vars.PreparedParams.String())
+			//fmt.Printf("params %s", vars.PreparedParams.String())
+		}
+		builder.WriteString("\n")
+		logutil.PutRecordOrDrop(builder.String())
+		//}(vars)
 	}
 
 	if variable.ProcessGeneralLog.Load() && !vars.InRestrictedSQL {
