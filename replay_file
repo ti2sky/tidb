@@ -1,2 +1,6 @@
-3 1 test use `test`
+3 1  use `test`
 3 2 test select * from t where a BETWEEN ? AND ?  [arguments: (1, 55)]
+5 3  use `test`
+7 3  use `test`
+7 4 sbtest SELECT c FROM sbtest6 WHERE id=?  [arguments: 57408]
+5 4 sbtest SELECT c FROM sbtest9 WHERE id BETWEEN ? AND ?  [arguments: (50409, 50508)]
