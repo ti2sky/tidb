@@ -82,7 +82,6 @@ func (r *recordReplayer) start() {
 		}
 		if s, exist := Sessions[record[0]]; !exist {
 			se, err := session.CreateSession(r.store)
-			fmt.Println(record[2])
 			if record[2] != "" {
 				se.GetSessionVars().CurrentDB = record[2]
 			}
@@ -126,8 +125,6 @@ func (m *sessionManager) replayExecuteSQL(sql string) error {
 		argument := strings.Split(args[1][:len(args[1])-1], ", ")
 		sql = helper(args[0], argument)
 	}
-	fmt.Println(sql)
-	fmt.Println("Current DB:", m.s.GetSessionVars().CurrentDB)
 	stmts, err := m.s.Parse(ctx, sql)
 	if err != nil {
 		return err

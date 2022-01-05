@@ -553,7 +553,7 @@ func (worker *copIteratorWorker) sendToRespCh(resp *copResponse, respCh chan<- *
 				}
 			}
 		})
-		worker.memTracker.Consume(consumed)
+		//worker.memTracker.Consume(consumed)
 	}
 	select {
 	case respCh <- resp:

@@ -46,7 +46,6 @@ func (h SQLRecorderHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) 
 	cfg := config.GetGlobalConfig()
 	params := mux.Vars(req)
 	if status, ok := params[pRecordStatus]; ok {
-		fmt.Println()
 		if status == "on" {
 			// set replay meta TS first.
 			cfg.ReplayMetaTS, err = strconv.ParseInt(params[pStartTS], 10, 64)
