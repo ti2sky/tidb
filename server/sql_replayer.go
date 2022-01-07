@@ -83,9 +83,10 @@ func (h SQLReplayHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if status == "on" {
 			replayutil.StartReplay(params[pFileName], h.Store)
 		} else {
-			replayutil.StopReplay()
+			go replayutil.StopReplay()
 		}
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("success"))
 		return
 	}
 	w.WriteHeader(http.StatusBadRequest)

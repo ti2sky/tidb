@@ -22,12 +22,14 @@ var Sessions map[string]*sessionManager
 
 // StartReplay starts replay
 func StartReplay(filename string, store kv.Storage) {
+	fmt.Println("start")
 	RecordReplayer = newRecordPlayer(filename, store)
 	go RecordReplayer.start()
 }
 
 // StopReplay stops replay
 func StopReplay() {
+	fmt.Println("stop")
 	RecordReplayer.close <- struct{}{}
 }
 
