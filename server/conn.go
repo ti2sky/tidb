@@ -42,6 +42,9 @@ import (
 	"encoding/binary"
 	goerr "errors"
 	"fmt"
+	"github.com/SkyAPM/go2sky"
+	"github.com/SkyAPM/go2sky/reporter"
+	language_agent "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
 	"io"
 	"net"
 	"os/user"
@@ -1016,6 +1019,8 @@ func (cc *clientConn) initConnect(ctx context.Context) error {
 	return nil
 }
 
+var tracerKey = struct{}{}
+
 // Run reads client query and writes query result to client in for loop, if there is a panic during query handling,
 // it will be recovered and log the panic error.
 // This function returns and the connection is closed if there is an IO error or there is a panic.
@@ -1041,6 +1046,20 @@ func (cc *clientConn) Run(ctx context.Context) {
 			terror.Log(err)
 		}
 	}()
+
+	swReporter, err := reporter.NewGRPCReporter("127.0.0.1:11800")
+	if err != nil {
+		terror.Log(err)
+		return
+	}
+	defer swReporter.Close()
+
+	swTracer, err := go2sky.NewTracer("tidb", go2sky.WithReporter(swReporter))
+	if err != nil {
+		terror.Log(err)
+		return
+	}
+	ctx = context.WithValue(ctx, tracerKey, swTracer)
 
 	// Usually, client connection status changes between [dispatching] <=> [reading].
 	// When some event happens, server may notify this client connection by setting
@@ -1246,6 +1265,11 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		ctx = opentracing.ContextWithSpan(ctx, span)
 	}
 
+	var tracer *go2sky.Tracer
+	if swTracer := ctx.Value(tracerKey); swTracer != nil {
+		tracer = swTracer.(*go2sky.Tracer)
+	}
+
 	var cancelFunc context.CancelFunc
 	ctx, cancelFunc = context.WithCancel(ctx)
 	cc.mu.Lock()
@@ -1305,6 +1329,18 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 	switch cmd {
 	case mysql.ComPing, mysql.ComStmtClose, mysql.ComStmtSendLongData, mysql.ComStmtReset,
 		mysql.ComSetOption, mysql.ComChangeUser:
+		if tracer != nil {
+			span, nCtx, err := tracer.CreateEntrySpan(ctx, strconv.Itoa(int(cmd)), func() (string, error) {
+				return "", nil
+			})
+			if err != nil {
+				terror.Log(err)
+			} else {
+				defer span.End()
+				span.SetSpanLayer(language_agent.SpanLayer_Database)
+				ctx = nCtx
+			}
+		}
 		cc.ctx.SetProcessInfo("", t, cmd, 0)
 	case mysql.ComInitDB:
 		cc.ctx.SetProcessInfo("use "+dataStr, t, cmd, 0)
@@ -1331,6 +1367,19 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		if len(data) > 0 && data[len(data)-1] == 0 {
 			data = data[:len(data)-1]
 			dataStr = string(hack.String(data))
+		}
+		if tracer != nil {
+			span, nCtx, err := tracer.CreateEntrySpan(ctx, "TiDB/Command/Query", func() (string, error) {
+				return "", nil
+			})
+			if err != nil {
+				terror.Log(err)
+			} else {
+				defer span.End()
+				span.SetSpanLayer(language_agent.SpanLayer_Database)
+				span.Tag("db.statement", dataStr)
+				ctx = nCtx
+			}
 		}
 		return cc.handleQuery(ctx, dataStr)
 	case mysql.ComFieldList:
