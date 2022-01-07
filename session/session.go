@@ -24,8 +24,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/SkyAPM/go2sky"
-	language_agent "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
 	"runtime/pprof"
 	"runtime/trace"
 	"strconv"
@@ -1637,17 +1635,6 @@ func (s *session) ExecuteStmt(ctx context.Context, stmtNode ast.StmtNode) (sqlex
 		defer span1.Finish()
 		ctx = opentracing.ContextWithSpan(ctx, span1)
 	}
-	if span := go2sky.SpanFromContext(ctx); span != nil {
-		tracer := (*span).Tracer()
-		s, c, e := tracer.CreateLocalSpan(ctx)
-		if e != nil {
-			return nil, e
-		}
-		s.SetOperationName("session.ExecuteStmt")
-		s.SetSpanLayer(language_agent.SpanLayer_Database)
-		defer s.End()
-		ctx = c
-	}
 
 	if err := s.PrepareTxnCtx(ctx); err != nil {
 		return nil, err
@@ -1802,17 +1789,6 @@ func runStmt(ctx context.Context, se *session, s sqlexec.Statement) (rs sqlexec.
 		span1.LogKV("sql", s.OriginText())
 		defer span1.Finish()
 		ctx = opentracing.ContextWithSpan(ctx, span1)
-	}
-	if span := go2sky.SpanFromContext(ctx); span != nil {
-		tracer := (*span).Tracer()
-		s, c, e := tracer.CreateLocalSpan(ctx)
-		if e != nil {
-			return nil, e
-		}
-		s.SetOperationName("session.runStmt")
-		s.SetSpanLayer(language_agent.SpanLayer_Database)
-		defer s.End()
-		ctx = c
 	}
 	se.SetValue(sessionctx.QueryString, s.OriginText())
 	if _, ok := s.(*executor.ExecStmt).StmtNode.(ast.DDLNode); ok {

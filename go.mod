@@ -8,7 +8,6 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.1.0 // indirect
 	github.com/Jeffail/gabs/v2 v2.5.1
-	github.com/SkyAPM/go2sky v0.5.0
 	github.com/aws/aws-sdk-go v1.35.3
 	github.com/blacktear23/go-proxyprotocol v0.0.0-20180807104634-af7a81e8dd0d
 	github.com/carlmjohnson/flagext v0.21.0
@@ -32,7 +31,7 @@ require (
 	github.com/golang/snappy v0.0.3
 	github.com/google/btree v1.0.0
 	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.1.2
 	github.com/gorilla/handlers v1.5.1 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0
@@ -100,8 +99,6 @@ require (
 replace google.golang.org/grpc => google.golang.org/grpc v1.29.1
 
 replace github.com/pingcap/tidb/parser => ./parser
-
-replace github.com/SkyAPM/go2sky => ../go2sky
 
 // fix potential security issue(CVE-2020-26160) introduced by indirect dependency.
 replace github.com/dgrijalva/jwt-go => github.com/form3tech-oss/jwt-go v3.2.6-0.20210809144907-32ab6a8243d7+incompatible
