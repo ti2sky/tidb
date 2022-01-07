@@ -32,9 +32,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/SkyAPM/go2sky"
 	language_agent "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
+	"github.com/google/uuid"
 	"github.com/ngaut/pools"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/errors"
