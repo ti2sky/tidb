@@ -1041,7 +1041,7 @@ func (cc *clientConn) Run(ctx context.Context) {
 		terror.Log(err)
 		return
 	}
-	defer swReporter.Close()
+	//defer swReporter.Close()
 
 	swTracer, err := go2sky.NewTracer("tidb", go2sky.WithReporter(swReporter))
 	if err != nil {
@@ -1318,22 +1318,11 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 	case mysql.ComPing, mysql.ComStmtClose, mysql.ComStmtSendLongData, mysql.ComStmtReset,
 		mysql.ComSetOption, mysql.ComChangeUser:
 		cc.ctx.SetProcessInfo("", t, cmd, 0)
-		if tracer != nil {
-			span, nCtx, err := tracer.CreateEntrySpan(ctx, strconv.Itoa(int(cmd)), func() (string, error) {
-				return "", nil
-			})
-			if err != nil {
-				terror.Log(err)
-			} else {
-				defer span.End()
-				span.SetSpanLayer(language_agent.SpanLayer_Database)
-				ctx = nCtx
-			}
-		}
+
 	case mysql.ComInitDB:
 		cc.ctx.SetProcessInfo("use "+dataStr, t, cmd, 0)
 		if tracer != nil {
-			span, nCtx, err := tracer.CreateEntrySpan(ctx, "TiDB/Command/Query", func() (string, error) {
+			span, nCtx, err := tracer.CreateEntrySpan(ctx, "TiDB/Command/InitDB", func() (string, error) {
 				return "", nil
 			})
 			if err != nil {
@@ -1368,6 +1357,19 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		if len(data) > 0 && data[len(data)-1] == 0 {
 			data = data[:len(data)-1]
 			dataStr = string(hack.String(data))
+		}
+		if tracer != nil {
+			span, nCtx, err := tracer.CreateEntrySpan(ctx, "TiDB/Command/Query", func() (string, error) {
+				return "", nil
+			})
+			if err != nil {
+				terror.Log(err)
+			} else {
+				defer span.End()
+				span.Tag("sql", dataStr)
+				span.SetSpanLayer(language_agent.SpanLayer_Database)
+				ctx = nCtx
+			}
 		}
 		return cc.handleQuery(ctx, dataStr)
 	case mysql.ComFieldList:
@@ -1810,6 +1812,17 @@ func (cc *clientConn) audit(eventType plugin.GeneralEvent) {
 // There is a special query `load data` that does not return result, which is handled differently.
 // Query `load stats` does not return result either.
 func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
+	if span := go2sky.SpanFromContext(ctx); span != nil {
+		tracer := (*span).Tracer()
+		s, c, e := tracer.CreateLocalSpan(ctx)
+		if e != nil {
+			return e
+		}
+		s.SetOperationName("clientConn.handleQuery")
+		s.SetSpanLayer(language_agent.SpanLayer_Database)
+		defer s.End()
+		ctx = c
+	}
 	defer trace.StartRegion(ctx, "handleQuery").End()
 	sc := cc.ctx.GetSessionVars().StmtCtx
 	cc.ctx.GetSessionVars().SQL = sql

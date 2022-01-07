@@ -1334,6 +1334,17 @@ func (s *session) Execute(ctx context.Context, sql string) (recordSets []sqlexec
 
 // Parse parses a query string to raw ast.StmtNode.
 func (s *session) Parse(ctx context.Context, sql string) ([]ast.StmtNode, error) {
+	if span := go2sky.SpanFromContext(ctx); span != nil {
+		tracer := (*span).Tracer()
+		s, c, e := tracer.CreateLocalSpan(ctx)
+		if e != nil {
+			return nil, e
+		}
+		s.SetOperationName("session.Parse")
+		s.SetSpanLayer(language_agent.SpanLayer_Database)
+		defer s.End()
+		ctx = c
+	}
 	parseStartTime := time.Now()
 	stmts, warns, err := s.ParseSQL(ctx, sql, s.sessionVars.GetParseParams()...)
 	if err != nil {
