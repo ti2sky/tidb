@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SkyAPM/go2sky"
+	language_agent "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
 	"github.com/cznic/mathutil"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/errors"
@@ -279,6 +281,17 @@ func Next(ctx context.Context, e Executor, req *chunk.Chunk) error {
 		span1 := span.Tracer().StartSpan(fmt.Sprintf("%T.Next", e), opentracing.ChildOf(span.Context()))
 		defer span1.Finish()
 		ctx = opentracing.ContextWithSpan(ctx, span1)
+	}
+	if span := go2sky.SpanFromContext(ctx); span != nil {
+		tracer := (*span).Tracer()
+		s, c, err := tracer.CreateLocalSpan(ctx)
+		if err != nil {
+			return err
+		}
+		s.SetOperationName(fmt.Sprintf("%T.Next", e))
+		s.SetSpanLayer(language_agent.SpanLayer_Database)
+		defer s.End()
+		ctx = c
 	}
 	if trace.IsEnabled() {
 		defer trace.StartRegion(ctx, fmt.Sprintf("%T.Next", e)).End()
