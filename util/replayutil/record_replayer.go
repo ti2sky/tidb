@@ -152,6 +152,7 @@ func (m *sessionManager) replayExecuteSQL(sql string) error {
 		terror.Log(err)
 	} else {
 		defer span.End()
+		span.Tag("sql", sql)
 		span.SetSpanLayer(language_agent.SpanLayer_Database)
 		ctx = nCtx
 	}
