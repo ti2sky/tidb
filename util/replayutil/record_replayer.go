@@ -43,20 +43,23 @@ func init() {
 }
 
 // StartReplay starts replay
-func StartReplay(filename string, store kv.Storage) {
-	fmt.Println("start")
-	RecordReplayer = newRecordPlayer(filename, store)
+func StartReplay(filename string, store kv.Storage, speed float64) {
+	fmt.Println("start replaying...")
+	RecordReplayer = newRecordPlayer(filename, store, speed)
 	go RecordReplayer.start()
 }
 
 // StopReplay stops replay
 func StopReplay() {
-	fmt.Println("stop")
-	RecordReplayer.close <- struct{}{}
+	fmt.Println("stop replaying...")
+	if RecordReplayer != nil {
+		RecordReplayer.close <- struct{}{}
+	}
 }
 
-func newRecordPlayer(filename string, store kv.Storage) *recordReplayer {
+func newRecordPlayer(filename string, store kv.Storage, speed float64) *recordReplayer {
 	r := &recordReplayer{
+		speed:    speed,
 		store:    store,
 		fileName: filename,
 		close:    make(chan struct{}),
@@ -65,6 +68,7 @@ func newRecordPlayer(filename string, store kv.Storage) *recordReplayer {
 }
 
 type recordReplayer struct {
+	speed    float64
 	store    kv.Storage
 	close    chan struct{}
 	fileName string
@@ -88,11 +92,19 @@ func (r *recordReplayer) start() {
 	r.scanner = bufio.NewScanner(f)
 	Sessions = make(map[string]*sessionManager)
 	start := time.Now()
+	var exit bool
+	var sleepTime float64
 	for r.scanner.Scan() {
 		select {
 		case <-r.close:
-			break
+			for _, se := range Sessions {
+				se.exit <- 1
+			}
+			exit = true
 		default:
+		}
+		if exit {
+			break
 		}
 		text := r.scanner.Text()
 		record := strings.SplitN(text, " ", 4)
@@ -100,9 +112,23 @@ func (r *recordReplayer) start() {
 			fmt.Printf("invalid sql log %v, len:%d\n", record, len(record))
 			continue
 		}
-		ts, _ := strconv.ParseFloat(record[1], 10)
-		if sleepTime := ts - time.Since(start).Seconds(); sleepTime > 0 {
-			time.Sleep(time.Duration(sleepTime) * time.Second)
+		s := 0
+		if strings.Contains(record[1], "ms") {
+			s = 1
+		}
+		metaTs := record[1][:len(record[1])-s-1]
+		ts, _ := strconv.ParseFloat(metaTs, 10)
+		if s != 0 {
+			sleepTime = (ts - time.Since(start).Seconds()*1e6) / r.speed
+			if sleepTime > 0 {
+				time.Sleep(time.Duration(sleepTime/r.speed) * time.Millisecond)
+			}
+		} else {
+			sleepTime = ts - time.Since(start).Seconds()
+			fmt.Println(sleepTime / r.speed)
+			if sleepTime > 0 {
+				time.Sleep(time.Duration(sleepTime/r.speed) * time.Second)
+			}
 		}
 		if s, exist := Sessions[record[0]]; !exist {
 			se, err := session.CreateSession(r.store)
@@ -127,17 +153,22 @@ func (r *recordReplayer) start() {
 	}
 }
 
-func (m sessionManager) replay() error {
+func (m sessionManager) replay() {
 	defer func() {
+		fmt.Println("stop replay!")
 		close(m.sqlCh)
 		close(m.exit)
 	}()
+	var exit bool
 	for {
+		if exit {
+			break
+		}
 		select {
+		case <-m.exit:
+			exit = true
 		case sql := <-m.sqlCh:
 			m.replayExecuteSQL(sql)
-		case <-m.exit:
-			break
 		}
 	}
 }

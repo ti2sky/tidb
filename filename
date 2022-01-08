@@ -1,0 +1,5 @@
+3 7s  select @@version_comment limit 1
+3 8s  SELECT DATABASE()
+3 9s  use `test`
+3 10s test show databases
+3 20s test show tables

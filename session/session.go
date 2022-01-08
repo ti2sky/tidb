@@ -2901,14 +2901,19 @@ func logStmt(execStmt *executor.ExecStmt, s *session) {
 func logGeneralQuery(execStmt *executor.ExecStmt, s *session, isPrepared bool) {
 	cfg := config.GetGlobalConfig()
 	vars := s.GetSessionVars()
-	if !s.isInternal() && cfg.EnableReplaySQL.Load() {
+	if !s.isInternal() && cfg.EnableRecordSQL.Load() {
 		//go func(vars *variable.SessionVars) {
 		//TODO: We need to add a client col also.
 		var builder strings.Builder
 		builder.WriteString(fmt.Sprintf("%v", vars.ConnectionID))
 		builder.WriteString(" ")
 		// Logic TS
-		ts := strconv.FormatInt(s.sessionVars.StartTime.Unix()-cfg.ReplayMetaTS, 10)
+		var ts string
+		if cfg.RecordSQLUnit.Load() {
+			ts = strconv.FormatInt(s.sessionVars.StartTime.UnixMilli()-cfg.ReplayMetaTS, 10) + "ms"
+		} else {
+			ts = strconv.FormatInt(s.sessionVars.StartTime.Unix()-cfg.ReplayMetaTS, 10) + "s"
+		}
 		builder.WriteString(ts)
 		builder.WriteString(" ")
 		builder.WriteString(vars.CurrentDB)

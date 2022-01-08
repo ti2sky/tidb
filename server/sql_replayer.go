@@ -45,26 +45,50 @@ func (h SQLRecorderHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) 
 	var err error
 	cfg := config.GetGlobalConfig()
 	params := mux.Vars(req)
-	if status, ok := params[pRecordStatus]; ok {
-		if status == "on" {
-			// set replay meta TS first.
-			cfg.ReplayMetaTS, err = strconv.ParseInt(params[pStartTS], 10, 64)
-			if err != nil {
-				fmt.Println(err.Error())
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			cfg.EnableReplaySQL.Store(true)
-			logutil.InitRecord(params[pFileName])
-		} else {
-			cfg.EnableReplaySQL.Store(false)
-			logutil.StopRecord()
+	var unit bool
+	if time, ok := params[pRecordTime]; ok {
+		if time == "ms" {
+			unit = true
 		}
-		w.WriteHeader(http.StatusOK)
+	}
+	// set replay meta TS first.
+	cfg.ReplayMetaTS, err = strconv.ParseInt(params[pStartTS], 10, 64)
+	if err != nil {
+		fmt.Println(err.Error())
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	w.WriteHeader(http.StatusBadRequest)
+	cfg.EnableRecordSQL.Store(true)
+	cfg.RecordSQLUnit.Store(unit)
+	fmt.Println("start recording...")
+	logutil.InitRecord(params[pFileName])
 
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
+// SQLRecorderCloser is the handler for dumping plan replayer file.
+type SQLRecorderCloser struct {
+	address    string
+	statusPort uint
+}
+
+func (s *Server) newSQLRecorderCloser() *SQLRecorderCloser {
+	cfg := config.GetGlobalConfig()
+	prh := &SQLRecorderCloser{
+		address:    cfg.AdvertiseAddress,
+		statusPort: cfg.Status.StatusPort,
+	}
+	return prh
+}
+
+func (h SQLRecorderCloser) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	cfg := config.GetGlobalConfig()
+	cfg.EnableRecordSQL.Store(false)
+	logutil.StopRecord()
+	fmt.Println("Stop recording...")
+	w.WriteHeader(http.StatusOK)
+	return
 }
 
 // SQLReplayHandler Replay handler
@@ -79,15 +103,34 @@ func (s *Server) newSQLReplayHandler(store kv.Storage) *SQLReplayHandler {
 
 func (h SQLReplayHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
-	if status, ok := params[pReplayStatus]; ok {
-		if status == "on" {
-			replayutil.StartReplay(params[pFileName], h.Store)
-		} else {
-			go replayutil.StopReplay()
+	var speed float64
+	var err error
+	if s, ok := params[pReplaySpeed]; ok {
+		speed, err = strconv.ParseFloat(s, 2)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Error argument for the speed!"))
 		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
-		return
 	}
-	w.WriteHeader(http.StatusBadRequest)
+	replayutil.StartReplay(params[pFileName], h.Store, speed)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("success"))
+	return
+}
+
+// SQLReplayCloser Replay handler
+type SQLReplayCloser struct {
+	Store kv.Storage
+}
+
+func (s *Server) newSQLReplayCloser(store kv.Storage) *SQLReplayCloser {
+	prh := &SQLReplayCloser{store}
+	return prh
+}
+
+func (h SQLReplayCloser) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	go replayutil.StopReplay()
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("success"))
+	return
 }

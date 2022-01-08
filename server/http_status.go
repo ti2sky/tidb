@@ -258,8 +258,10 @@ func (s *Server) startHTTPServer() {
 	router.Handle("/metrics/profile", profileHandler{tikvHandlerTool})
 	fmt.Println("register replay sql")
 	// HTTP path for start record and replay sql.
-	router.Handle("/record/{filename}/{recordStatus}/{startTS}", s.newSQLRecorderHandler())
-	router.Handle("/replay/{filename}/{replayStatus}", s.newSQLReplayHandler(tikvHandlerTool.Store))
+	router.Handle("/record/{filename}/{startTS}/{recordTime}", s.newSQLRecorderHandler())
+	router.Handle("/record/off", s.newSQLRecorderCloser())
+	router.Handle("/replay/{filename}/{replaySpeed}", s.newSQLReplayHandler(tikvHandlerTool.Store))
+	router.Handle("/replay/off", s.newSQLReplayCloser(tikvHandlerTool.Store))
 	// HTTP path for web UI.
 	if host, port, err := net.SplitHostPort(s.statusAddr); err == nil {
 		if host == "" {
