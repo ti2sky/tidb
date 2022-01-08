@@ -82,6 +82,23 @@ type sessionManager struct {
 }
 
 func (r *recordReplayer) start() {
+	unit := false
+	metaTS := time.Now().Unix()
+	var snapshot string
+	if unit {
+		snapshot = time.Unix(metaTS/1e6, 0).Format("2006-01-02 15:04:05")
+	} else {
+		snapshot = time.Unix(metaTS, 0).Format("2006-01-02 15:04:05")
+	}
+	snapshot = snapshot
+	dir, _ := os.Getwd()
+	ctx := context.Background()
+	restoreSession, err := session.CreateSession(r.store)
+	sql := fmt.Sprintf("BACKUP DATABASE `test` TO 'local://%s';", dir)
+	restoreSession.Execute(ctx, sql)
+	sql = fmt.Sprintf("RESTORE DATABASE * FROM 'local://%s';", dir)
+	restoreSession.Execute(ctx, sql)
+	return
 	f, err := os.OpenFile(r.fileName, os.O_RDONLY, os.ModePerm)
 	defer f.Close()
 	if err != nil {
@@ -133,7 +150,7 @@ func (r *recordReplayer) start() {
 		if s, exist := Sessions[record[0]]; !exist {
 			se, err := session.CreateSession(r.store)
 			if record[2] != "" {
-				se.GetSessionVars().CurrentDB = record[2]
+				se.GetSessionVars().CurrentDB = record[2] + "_test"
 			}
 			sm := &sessionManager{
 				s:     se,
