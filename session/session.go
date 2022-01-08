@@ -1341,6 +1341,7 @@ func (s *session) Parse(ctx context.Context, sql string) ([]ast.StmtNode, error)
 			return nil, e
 		}
 		s.SetOperationName("session.Parse")
+		s.Tag("sql", sql)
 		s.SetSpanLayer(language_agent.SpanLayer_Database)
 		defer s.End()
 		ctx = c

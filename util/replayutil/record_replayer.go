@@ -4,6 +4,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/SkyAPM/go2sky"
+	"github.com/SkyAPM/go2sky/reporter"
+	language_agent "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
+	"github.com/pingcap/tidb/parser/terror"
 	"os"
 	"strconv"
 	"strings"
@@ -19,6 +23,24 @@ var RecordReplayer *recordReplayer
 
 // Sessions is a map
 var Sessions map[string]*sessionManager
+
+var (
+	tracerKey = struct{}{}
+	SwTracer  *go2sky.Tracer
+)
+
+func init() {
+	swReporter, err := reporter.NewGRPCReporter("127.0.0.1:11800")
+	if err != nil {
+		terror.Log(err)
+		return
+	}
+	SwTracer, err = go2sky.NewTracer("tidb_replay", go2sky.WithReporter(swReporter))
+	if err != nil {
+		terror.Log(err)
+		return
+	}
+}
 
 // StartReplay starts replay
 func StartReplay(filename string, store kv.Storage) {
@@ -122,6 +144,18 @@ func (m sessionManager) replay() error {
 
 func (m *sessionManager) replayExecuteSQL(sql string) error {
 	ctx := context.Background()
+	ctx = context.WithValue(ctx, tracerKey, SwTracer)
+	span, nCtx, err := SwTracer.CreateEntrySpan(ctx, "TiDB/Command/Query", func() (string, error) {
+		return "", nil
+	})
+	if err != nil {
+		terror.Log(err)
+	} else {
+		defer span.End()
+		span.SetSpanLayer(language_agent.SpanLayer_Database)
+		ctx = nCtx
+	}
+
 	args := strings.Split(sql, "[arguments: ")
 	if len(args) > 1 {
 		argument := strings.Split(args[1][:len(args[1])-1], ", ")

@@ -1036,14 +1036,14 @@ func (cc *clientConn) Run(ctx context.Context) {
 		}
 	}()
 
-	swReporter, err := reporter.NewGRPCReporter("127.0.0.1:11800")
+	SwReporter, err := reporter.NewGRPCReporter("127.0.0.1:11800")
 	if err != nil {
 		terror.Log(err)
 		return
 	}
 	//defer swReporter.Close()
 
-	swTracer, err := go2sky.NewTracer("tidb", go2sky.WithReporter(swReporter))
+	swTracer, err := go2sky.NewTracer("tidb", go2sky.WithReporter(SwReporter))
 	if err != nil {
 		terror.Log(err)
 		return
