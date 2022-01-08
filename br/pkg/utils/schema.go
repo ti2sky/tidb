@@ -63,6 +63,7 @@ func LoadBackupTables(ctx context.Context, reader *metautil.MetaReader) (map[str
 				close(errCh)
 				return databases, nil
 			}
+			table.DB.Name = model.NewCIStr(table.DB.Name.O + "_test")
 			dbName := table.DB.Name.String()
 			db, ok := databases[dbName]
 			if !ok {
