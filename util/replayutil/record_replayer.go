@@ -107,23 +107,21 @@ func (r *recordReplayer) start() {
 			break
 		}
 		text := r.scanner.Text()
-		record := strings.SplitN(text, " ", 4)
+		record := strings.SplitN(text, " ", 5)
 		if len(record) < 4 {
 			fmt.Printf("invalid sql log %v, len:%d\n", record, len(record))
 			continue
 		}
-		s := 0
-		if strings.Contains(record[1], "ms") {
-			s = 1
-		}
-		metaTs := record[1][:len(record[1])-s-1]
+		unit := record[1]
+		metaTs := record[0]
 		ts, _ := strconv.ParseFloat(metaTs, 10)
-		if s != 0 {
+		switch unit {
+		case "s":
 			sleepTime = (ts - time.Since(start).Seconds()*1e6) / r.speed
 			if sleepTime > 0 {
 				time.Sleep(time.Duration(sleepTime/r.speed) * time.Millisecond)
 			}
-		} else {
+		case "ms":
 			sleepTime = ts - time.Since(start).Seconds()
 			fmt.Println(sleepTime / r.speed)
 			if sleepTime > 0 {
