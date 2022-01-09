@@ -2909,12 +2909,17 @@ func logGeneralQuery(execStmt *executor.ExecStmt, s *session, isPrepared bool) {
 		builder.WriteString(" ")
 		// Logic TS
 		var ts string
+		var unit string
 		if cfg.RecordSQLUnit.Load() {
-			ts = strconv.FormatInt(s.sessionVars.StartTime.UnixMilli()-cfg.ReplayMetaTS, 10) + "ms"
+			ts = strconv.FormatInt(s.sessionVars.StartTime.UnixNano() / 1e6 -cfg.ReplayMetaTS, 10)
+			unit = "ms"
 		} else {
-			ts = strconv.FormatInt(s.sessionVars.StartTime.Unix()-cfg.ReplayMetaTS, 10) + "s"
+			ts = strconv.FormatInt(s.sessionVars.StartTime.Unix()-cfg.ReplayMetaTS, 10)
+			unit = "s"
 		}
 		builder.WriteString(ts)
+		builder.WriteString(" ")
+		builder.WriteString(unit)
 		builder.WriteString(" ")
 		builder.WriteString(vars.CurrentDB)
 		builder.WriteString(" ")
