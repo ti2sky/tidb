@@ -3,6 +3,7 @@ package replayutil
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/SkyAPM/go2sky"
 	"github.com/SkyAPM/go2sky/reporter"
@@ -81,7 +82,40 @@ type sessionManager struct {
 	exit  chan int
 }
 
+func  (r *recordReplayer)shadowHelper()  {
+	unit := false
+	metaTS := time.Now().Unix()
+	var snapshot string
+	if unit {
+		snapshot = time.Unix(metaTS/1e6, 0).Format("2006-01-02 15:04:05")
+	} else {
+		snapshot = time.Unix(metaTS, 0).Format("2006-01-02 15:04:05")
+	}
+	snapshot = snapshot
+	dir, _ := os.Getwd()
+	DB, err := sql.Open("mysql", "root@tcp(127.0.0.1:4000)/test")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	sql := fmt.Sprintf("BACKUP DATABASE `test` TO 'local://%s/testbackup';", dir)
+	_, err = DB.Exec(sql)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	sql = fmt.Sprintf("RESTORE DATABASE * FROM 'local://%s/testbackup';", dir)
+	_, err = DB.Exec(sql)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+}
+
 func (r *recordReplayer) start() {
+	fmt.Println("build shadow databases")
+	r.shadowHelper()
+	return
 	f, err := os.OpenFile(r.fileName, os.O_RDONLY, os.ModePerm)
 	defer f.Close()
 	if err != nil {
@@ -131,7 +165,7 @@ func (r *recordReplayer) start() {
 		if s, exist := Sessions[record[0]]; !exist {
 			se, err := session.CreateSession(r.store)
 			if record[2] != "" {
-				se.GetSessionVars().CurrentDB = record[2]
+				se.GetSessionVars().CurrentDB = record[2] + "_test"
 			}
 			sm := &sessionManager{
 				s:     se,
